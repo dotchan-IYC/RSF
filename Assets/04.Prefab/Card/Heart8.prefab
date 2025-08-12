@@ -101,10 +101,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b8f6f2985cbe5994ab369cf37565ef26, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cardValue: 0
+  cardValue: 8
   cardSuit: 0
   _rank: 8
-  _suit: 3
+  _suit: 0
 --- !u!61 &-1084154292945040910
 BoxCollider2D:
   m_ObjectHideFlags: 0

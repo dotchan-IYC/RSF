@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -33,8 +34,8 @@ namespace Code.RSF
                 cardChange.ChangeHandRanking += UpdateHandRanking;
             }
 
-            // 초기 족보 체크
-            Invoke("CheckInitialHand", 1f);
+            // 초기 족보 체크는 카드가 딜링된 후에만 실행
+            // Invoke("CheckInitialHand", 1f); // 제거: 빈 카드로 인한 에러 방지
         }
 
         private void CheckInitialHand()
@@ -70,6 +71,13 @@ namespace Code.RSF
                     if (allCards[i] != null)
                     {
                         Debug.Log($"Card {i}: {allCards[i].name}");
+
+                        // 스프라이트 이름도 출력
+                        Image cardImage = allCards[i].GetComponent<Image>();
+                        if (cardImage != null && cardImage.sprite != null)
+                        {
+                            Debug.Log($"  → Sprite: {cardImage.sprite.name}");
+                        }
                     }
                     else
                     {
@@ -84,11 +92,18 @@ namespace Code.RSF
 
             if (showDebugInfo)
             {
-                Debug.Log("Current Hand Ranking: " + currentHandRanking);
+                if (currentHandRankType != HandRankType.None)
+                {
+                    Debug.Log("Current Hand Ranking: " + currentHandRanking);
+                }
+                else
+                {
+                    Debug.Log("No hand ranking (cards not dealt or incomplete)");
+                }
             }
 
-            // GameManager에 결과 전달
-            if (GameManager.Instance != null)
+            // GameManager에 결과 전달 (카드가 실제로 딜링된 경우만)
+            if (GameManager.Instance != null && currentHandRankType != HandRankType.None)
             {
                 GameManager.Instance.ProcessHandResult(currentHandRankType);
             }
@@ -298,9 +313,23 @@ namespace Code.RSF
                 }
             }
 
+            // 카드가 하나도 딜링되지 않은 경우
+            if (cardInfos.Count == 0)
+            {
+                if (showDebugInfo)
+                {
+                    Debug.Log("No cards dealt yet - skipping hand evaluation");
+                }
+                return HandRankType.None;
+            }
+
+            // 5장이 모두 딜링되지 않은 경우
             if (cardInfos.Count != 5)
             {
-                Debug.LogWarning($"Could not extract all card info. Found {cardInfos.Count}/5 cards");
+                if (showDebugInfo)
+                {
+                    Debug.Log($"Incomplete hand: Found {cardInfos.Count}/5 cards - skipping evaluation");
+                }
                 return HandRankType.None;
             }
 
@@ -332,7 +361,7 @@ namespace Code.RSF
             return HandRankType.None;
         }
 
-        // 카드 정보를 추출하는 함수 (여러 방법 시도)
+        // 카드 정보를 추출하는 함수 (빈 카드 처리 개선)
         private CardInfo GetCardInfo(GameObject cardObject)
         {
             CardInfo info = new CardInfo();
@@ -342,7 +371,6 @@ namespace Code.RSF
             CardScript cardScript = cardObject.GetComponent<CardScript>();
             if (cardScript != null)
             {
-                // RSF 시스템용 필드가 있는지 확인
                 try
                 {
                     var valueField = cardScript.GetType().GetField("cardValue");
@@ -355,60 +383,146 @@ namespace Code.RSF
 
                         if (info.value > 0 && info.value <= 13)
                         {
+                            if (showDebugInfo)
+                            {
+                                Debug.Log($"Card info from CardScript: {cardObject.name} = Value: {info.value}, Suit: {info.suit}");
+                            }
                             return info;
                         }
                     }
                 }
-                catch { }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning($"Error reading CardScript from {cardObject.name}: {e.Message}");
+                }
             }
 
-            // 방법 2: 카드 이름에서 추출 (예: "HeartAce", "SpadeKing" 등)
-            string cardName = cardObject.name.ToLower();
-
-            // 슈트 판별
-            if (cardName.Contains("heart"))
-                info.suit = CardSuit.Hearts;
-            else if (cardName.Contains("diamond"))
-                info.suit = CardSuit.Diamonds;
-            else if (cardName.Contains("club"))
-                info.suit = CardSuit.Clubs;
-            else if (cardName.Contains("spade"))
-                info.suit = CardSuit.Spades;
-
-            // 값 판별
-            if (cardName.Contains("ace") || cardName.Contains("a"))
-                info.value = 1;
-            else if (cardName.Contains("king") || cardName.Contains("k"))
-                info.value = 13;
-            else if (cardName.Contains("queen") || cardName.Contains("q"))
-                info.value = 12;
-            else if (cardName.Contains("jack") || cardName.Contains("j"))
-                info.value = 11;
-            else if (cardName.Contains("10"))
-                info.value = 10;
-            else if (cardName.Contains("9"))
-                info.value = 9;
-            else if (cardName.Contains("8"))
-                info.value = 8;
-            else if (cardName.Contains("7"))
-                info.value = 7;
-            else if (cardName.Contains("6"))
-                info.value = 6;
-            else if (cardName.Contains("5"))
-                info.value = 5;
-            else if (cardName.Contains("4"))
-                info.value = 4;
-            else if (cardName.Contains("3"))
-                info.value = 3;
-            else if (cardName.Contains("2"))
-                info.value = 2;
-
-            // 방법 3: 기본값 설정 (테스트용)
-            if (info.value == 0)
+            // 방법 2: Image 컴포넌트의 스프라이트 이름에서 추출
+            Image cardImage = cardObject.GetComponent<Image>();
+            if (cardImage != null && cardImage.sprite != null)
             {
-                Debug.LogWarning($"Could not determine card value for {cardObject.name}. Using default values.");
-                info.value = Random.Range(1, 14); // 임시 랜덤 값
-                info.suit = (CardSuit)Random.Range(0, 4); // 임시 랜덤 슈트
+                string spriteName = cardImage.sprite.name;
+
+                if (showDebugInfo)
+                {
+                    Debug.Log($"Reading sprite name: {spriteName} from object: {cardObject.name}");
+                }
+
+                // 슈트 판별 (정확한 시작 문자열로 체크)
+                if (spriteName.StartsWith("Heart"))
+                    info.suit = CardSuit.Hearts;
+                else if (spriteName.StartsWith("Diamond"))
+                    info.suit = CardSuit.Diamonds;
+                else if (spriteName.StartsWith("Club"))
+                    info.suit = CardSuit.Clubs;
+                else if (spriteName.StartsWith("Spade"))
+                    info.suit = CardSuit.Spades;
+                else
+                {
+                    if (showDebugInfo)
+                        Debug.LogWarning($"Cannot determine suit for sprite: {spriteName} on object: {cardObject.name}");
+                    return info; // 슈트를 판별할 수 없으면 기본값 반환
+                }
+
+                // 값 판별 (정확한 끝 문자열로 체크)
+                if (spriteName.EndsWith("Ace"))
+                    info.value = 1;
+                else if (spriteName.EndsWith("King"))
+                    info.value = 13;
+                else if (spriteName.EndsWith("Queen"))
+                    info.value = 12;
+                else if (spriteName.EndsWith("Jack"))
+                    info.value = 11;
+                else if (spriteName.EndsWith("10"))
+                    info.value = 10;
+                else if (spriteName.EndsWith("9"))
+                    info.value = 9;
+                else if (spriteName.EndsWith("8"))
+                    info.value = 8;
+                else if (spriteName.EndsWith("7"))
+                    info.value = 7;
+                else if (spriteName.EndsWith("6"))
+                    info.value = 6;
+                else if (spriteName.EndsWith("5"))
+                    info.value = 5;
+                else if (spriteName.EndsWith("4"))
+                    info.value = 4;
+                else if (spriteName.EndsWith("3"))
+                    info.value = 3;
+                else if (spriteName.EndsWith("2"))
+                    info.value = 2;
+                else
+                {
+                    if (showDebugInfo)
+                        Debug.LogWarning($"Cannot determine value for sprite: {spriteName} on object: {cardObject.name}");
+                    return info; // 값을 판별할 수 없으면 기본값 반환
+                }
+
+                if (showDebugInfo)
+                {
+                    Debug.Log($"Card info from sprite: {spriteName} = Value: {info.value}, Suit: {info.suit}");
+                }
+
+                return info;
+            }
+
+            // 방법 3: 카드 오브젝트 이름에서 추출 (fallback)
+            string cardName = cardObject.name;
+
+            // 슈트 판별 (정확한 시작 문자열로 체크)
+            if (cardName.StartsWith("Heart"))
+                info.suit = CardSuit.Hearts;
+            else if (cardName.StartsWith("Diamond"))
+                info.suit = CardSuit.Diamonds;
+            else if (cardName.StartsWith("Club"))
+                info.suit = CardSuit.Clubs;
+            else if (cardName.StartsWith("Spade"))
+                info.suit = CardSuit.Spades;
+            else
+            {
+                // 빈 카드는 조용히 무시 (에러 대신 워닝만)
+                if (showDebugInfo)
+                    Debug.LogWarning($"Card {cardName} has no sprite assigned - skipping");
+                return info; // 빈 카드는 value=0으로 반환되어 무시됨
+            }
+
+            // 값 판별 (정확한 끝 문자열로 체크)
+            if (cardName.EndsWith("Ace"))
+                info.value = 1;
+            else if (cardName.EndsWith("King"))
+                info.value = 13;
+            else if (cardName.EndsWith("Queen"))
+                info.value = 12;
+            else if (cardName.EndsWith("Jack"))
+                info.value = 11;
+            else if (cardName.EndsWith("10"))
+                info.value = 10;
+            else if (cardName.EndsWith("9"))
+                info.value = 9;
+            else if (cardName.EndsWith("8"))
+                info.value = 8;
+            else if (cardName.EndsWith("7"))
+                info.value = 7;
+            else if (cardName.EndsWith("6"))
+                info.value = 6;
+            else if (cardName.EndsWith("5"))
+                info.value = 5;
+            else if (cardName.EndsWith("4"))
+                info.value = 4;
+            else if (cardName.EndsWith("3"))
+                info.value = 3;
+            else if (cardName.EndsWith("2"))
+                info.value = 2;
+            else
+            {
+                if (showDebugInfo)
+                    Debug.LogWarning($"Cannot determine value for card: {cardName}");
+                return info; // 값을 판별할 수 없으면 기본값 반환
+            }
+
+            if (showDebugInfo)
+            {
+                Debug.Log($"Card info from name: {cardName} = Value: {info.value}, Suit: {info.suit}");
             }
 
             return info;
@@ -516,6 +630,7 @@ namespace Code.RSF
                 case HandRankType.OnePair: return "One Pair";
                 case HandRankType.RedFlush: return "Red Flush";
                 case HandRankType.BlackFlush: return "Black Flush";
+                case HandRankType.None: return "No Hand";
                 default: return "High Card";
             }
         }

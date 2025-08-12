@@ -206,7 +206,7 @@ public class UIManager : MonoBehaviour
     public void OnDealClicked()
     {
         // 기존 카드 시스템과 연결
-        HandRankingsBridge bridge = FindObjectOfType<HandRankingsBridge>();
+        HandRankingsBridge bridge = FindAnyObjectByType<HandRankingsBridge>();
         if (bridge != null)
         {
             bridge.EvaluateHand();

@@ -101,8 +101,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b8f6f2985cbe5994ab369cf37565ef26, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cardValue: 0
-  cardSuit: 0
+  cardValue: 2
+  cardSuit: 2
   _rank: 2
   _suit: 2
 --- !u!61 &7342470304638706246
