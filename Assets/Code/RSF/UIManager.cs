@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Code.RSF;
 
 public class UIManager : MonoBehaviour
 {
@@ -10,6 +11,7 @@ public class UIManager : MonoBehaviour
     public TextMeshProUGUI handRankText;
     public TextMeshProUGUI payoutText;
     public TextMeshProUGUI comboText;
+    public CardDealer cardDealer;
 
     [Header("Betting UI")]
     public Slider betSlider;
@@ -212,6 +214,10 @@ public class UIManager : MonoBehaviour
             bridge.EvaluateHand();
         }
         Debug.Log("Dealing cards...");
+        if (cardDealer != null)
+        {
+            cardDealer.DealCards();
+        }
     }
 
     public void OnChangeCardsClicked()

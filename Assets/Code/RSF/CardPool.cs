@@ -11,6 +11,10 @@ namespace Code.RSF
         GameObject[] _newPool;//새로 섞은 풀
         bool _isDraw;//드로우 했는가?
         public event Action DrawCards;
+        public GameObject[] Cards
+        {
+            get { return _cards; }
+        }
 
         private void Awake()
         {
