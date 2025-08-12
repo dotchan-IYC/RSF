@@ -1,65 +1,573 @@
+using UnityEngine;
+using System.Collections.Generic;
+using System.Linq;
 
+namespace Code.RSF
+{
+    public class HandRankings : MonoBehaviour
+    {
+        [Header("Current Hand Info")]
+        public string currentHandRanking;
+        public HandRankType currentHandRankType = HandRankType.None;
 
+        [Header("Components")]
+        private HandCard handCard;
+        private CommunityCards communityCards;
+        private CardChange cardChange;
 
+        [Header("Debug")]
+        public bool showDebugInfo = false;
 
+        [Header("Manual Card References (Fallback)")]
+        public GameObject[] manualHandCards = new GameObject[2];
+        public GameObject[] manualCommunityCards = new GameObject[3];
 
-//조금 만들다가 족보 네 파트라고 해서 일단은 주석으로만 남겨뒀어 지워도 상관 X
+        private void Start()
+        {
+            handCard = GetComponent<HandCard>();
+            communityCards = GetComponent<CommunityCards>();
+            cardChange = GetComponent<CardChange>();
 
+            if (cardChange != null)
+            {
+                cardChange.ChangeHandRanking += UpdateHandRanking;
+            }
 
+            // 초기 족보 체크
+            Invoke("CheckInitialHand", 1f);
+        }
 
+        private void CheckInitialHand()
+        {
+            UpdateHandRanking();
+        }
 
+        private void UpdateHandRanking()
+        {
+            // 5장의 카드 배열 생성 (손패 2장 + 커뮤니티 3장)
+            GameObject[] allCards = new GameObject[5];
 
+            // 손패 2장 가져오기 (여러 방법 시도)
+            GameObject[] handCards = GetHandCards();
+            for (int i = 0; i < 2 && i < handCards.Length; i++)
+            {
+                allCards[i] = handCards[i];
+            }
 
+            // 커뮤니티 카드 3장 가져오기 (여러 방법 시도)
+            GameObject[] commCards = GetCommunityCards();
+            for (int i = 0; i < 3 && i < commCards.Length; i++)
+            {
+                allCards[i + 2] = commCards[i];
+            }
 
+            // 디버그: 카드 정보 출력
+            if (showDebugInfo)
+            {
+                Debug.Log("=== Card Debug Info ===");
+                for (int i = 0; i < allCards.Length; i++)
+                {
+                    if (allCards[i] != null)
+                    {
+                        Debug.Log($"Card {i}: {allCards[i].name}");
+                    }
+                    else
+                    {
+                        Debug.Log($"Card {i}: NULL");
+                    }
+                }
+            }
 
+            // 족보 판정
+            currentHandRankType = EvaluateHand(allCards);
+            currentHandRanking = GetHandRankingName(currentHandRankType);
 
-//using Code.RSF;
-//using System;
-//using UnityEngine;
+            if (showDebugInfo)
+            {
+                Debug.Log("Current Hand Ranking: " + currentHandRanking);
+            }
 
-//namespace Code.RSF
-//{
-//    public class HandRankings : MonoBehaviour
-//    {
-//        public string _handRanking;//현재 족보
-//        HandCard _handCard;
-//        CommunityCards _communityCards;
-//        CardChange _cardChange;
-//        private void Start()
-//        {
-//            _handCard = GetComponent<HandCard>();
-//            _communityCards = GetComponent<CommunityCards>();
-//            _cardChange = GetComponent<CardChange>();
-//            _cardChange.ChangeHandRanking += UpdateHandRanking; 이거 문장 쓰면 클릭했을 때 족보 바뀌는 거 메소드 만들 수 있음
-//        }
+            // GameManager에 결과 전달
+            if (GameManager.Instance != null)
+            {
+                GameManager.Instance.ProcessHandResult(currentHandRankType);
+            }
+        }
 
-//        private void UpdateHandRanking()  나는 카드를 한 번 정렬한 뒤에 족보를 따지는 게 괜찮아보여서 이케 해봄
-//        {
-//            GameObject[] cards = new GameObject[5];
-//            for (int i = 0; i < 3; i++)
-//            {
-//                cards[i + 2] = _communityCards._communityCards[i];//공유 카드를 0 + 2번, 1 + 2번, 2 + 2번 자리에 넣음
-//                if (i != 2) cards[i] = _handCard._handCards[i];//손 패를 0, 1번 자리에 넣음. i가 2면 작동하지 않음.
-//            }
+        // 손패 카드들을 가져오는 함수 (여러 방법 시도)
+        private GameObject[] GetHandCards()
+        {
+            GameObject[] cards = new GameObject[2];
 
-//            GameObject[] cards2 = new GameObject[5];
-//            for (int i = 0; i < 5; i++)//오름차순 정렬
-//            {
-//                for (int j = 4; j >= i; j--)
-//                {
-//                    if (cards2[i] == null)
-//                    {
-//                        cards2[i] = cards[j];
-//                    }
-//                    else
-//                    {
-//                        if (cards2[i]. < cards[j])
-//                        {
+            if (handCard != null)
+            {
+                // 방법 1: _handCards 필드 시도
+                try
+                {
+                    var field = handCard.GetType().GetField("_handCards");
+                    if (field != null)
+                    {
+                        GameObject[] fieldValue = field.GetValue(handCard) as GameObject[];
+                        if (fieldValue != null && fieldValue.Length >= 2)
+                        {
+                            return fieldValue;
+                        }
+                    }
+                }
+                catch { }
 
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//    }
-//}
+                // 방법 2: handCards 필드 시도
+                try
+                {
+                    var field = handCard.GetType().GetField("handCards");
+                    if (field != null)
+                    {
+                        GameObject[] fieldValue = field.GetValue(handCard) as GameObject[];
+                        if (fieldValue != null && fieldValue.Length >= 2)
+                        {
+                            return fieldValue;
+                        }
+                    }
+                }
+                catch { }
+
+                // 방법 3: _handCard 필드 시도
+                try
+                {
+                    var field = handCard.GetType().GetField("_handCard");
+                    if (field != null)
+                    {
+                        GameObject[] fieldValue = field.GetValue(handCard) as GameObject[];
+                        if (fieldValue != null && fieldValue.Length >= 2)
+                        {
+                            return fieldValue;
+                        }
+                    }
+                }
+                catch { }
+
+                // 방법 4: cards 필드 시도
+                try
+                {
+                    var field = handCard.GetType().GetField("cards");
+                    if (field != null)
+                    {
+                        GameObject[] fieldValue = field.GetValue(handCard) as GameObject[];
+                        if (fieldValue != null && fieldValue.Length >= 2)
+                        {
+                            return fieldValue;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 방법 5: 수동 설정된 카드들 사용
+            if (manualHandCards != null && manualHandCards.Length >= 2)
+            {
+                bool hasValidCards = true;
+                for (int i = 0; i < 2; i++)
+                {
+                    if (manualHandCards[i] == null)
+                    {
+                        hasValidCards = false;
+                        break;
+                    }
+                }
+                if (hasValidCards)
+                {
+                    return manualHandCards;
+                }
+            }
+
+            Debug.LogWarning("Could not find hand cards! Please check HandCard component or set manual references.");
+            return cards; // 빈 배열 반환
+        }
+
+        // 커뮤니티 카드들을 가져오는 함수 (여러 방법 시도)
+        private GameObject[] GetCommunityCards()
+        {
+            GameObject[] cards = new GameObject[3];
+
+            if (communityCards != null)
+            {
+                // 방법 1: _communityCards 필드 시도
+                try
+                {
+                    var field = communityCards.GetType().GetField("_communityCards");
+                    if (field != null)
+                    {
+                        GameObject[] fieldValue = field.GetValue(communityCards) as GameObject[];
+                        if (fieldValue != null && fieldValue.Length >= 3)
+                        {
+                            return fieldValue;
+                        }
+                    }
+                }
+                catch { }
+
+                // 방법 2: communityCards 필드 시도
+                try
+                {
+                    var field = communityCards.GetType().GetField("communityCards");
+                    if (field != null)
+                    {
+                        GameObject[] fieldValue = field.GetValue(communityCards) as GameObject[];
+                        if (fieldValue != null && fieldValue.Length >= 3)
+                        {
+                            return fieldValue;
+                        }
+                    }
+                }
+                catch { }
+
+                // 방법 3: _communityCard 필드 시도
+                try
+                {
+                    var field = communityCards.GetType().GetField("_communityCard");
+                    if (field != null)
+                    {
+                        GameObject[] fieldValue = field.GetValue(communityCards) as GameObject[];
+                        if (fieldValue != null && fieldValue.Length >= 3)
+                        {
+                            return fieldValue;
+                        }
+                    }
+                }
+                catch { }
+
+                // 방법 4: cards 필드 시도
+                try
+                {
+                    var field = communityCards.GetType().GetField("cards");
+                    if (field != null)
+                    {
+                        GameObject[] fieldValue = field.GetValue(communityCards) as GameObject[];
+                        if (fieldValue != null && fieldValue.Length >= 3)
+                        {
+                            return fieldValue;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 방법 5: 수동 설정된 카드들 사용
+            if (manualCommunityCards != null && manualCommunityCards.Length >= 3)
+            {
+                bool hasValidCards = true;
+                for (int i = 0; i < 3; i++)
+                {
+                    if (manualCommunityCards[i] == null)
+                    {
+                        hasValidCards = false;
+                        break;
+                    }
+                }
+                if (hasValidCards)
+                {
+                    return manualCommunityCards;
+                }
+            }
+
+            Debug.LogWarning("Could not find community cards! Please check CommunityCards component or set manual references.");
+            return cards; // 빈 배열 반환
+        }
+
+        public HandRankType EvaluateHand(GameObject[] cards)
+        {
+            if (cards == null || cards.Length != 5)
+            {
+                Debug.LogWarning("Invalid card array for hand evaluation");
+                return HandRankType.None;
+            }
+
+            // 카드 정보 추출
+            List<CardInfo> cardInfos = new List<CardInfo>();
+
+            for (int i = 0; i < cards.Length; i++)
+            {
+                if (cards[i] != null)
+                {
+                    // 여러 방법으로 카드 정보 가져오기 시도
+                    CardInfo info = GetCardInfo(cards[i]);
+                    if (info.value > 0) // 유효한 카드인지 확인
+                    {
+                        cardInfos.Add(info);
+                    }
+                }
+            }
+
+            if (cardInfos.Count != 5)
+            {
+                Debug.LogWarning($"Could not extract all card info. Found {cardInfos.Count}/5 cards");
+                return HandRankType.None;
+            }
+
+            // 카드를 값으로 정렬
+            cardInfos.Sort((a, b) => a.value.CompareTo(b.value));
+
+            if (showDebugInfo)
+            {
+                Debug.Log("=== Card Values ===");
+                foreach (var card in cardInfos)
+                {
+                    Debug.Log($"Value: {card.value}, Suit: {card.suit}");
+                }
+            }
+
+            // 족보 판정 (높은 순위부터 확인)
+            if (IsRoyalStraightFlush(cardInfos)) return HandRankType.RoyalStraightFlush;
+            if (IsStraightFlush(cardInfos)) return HandRankType.StraightFlush;
+            if (IsFourOfAKind(cardInfos)) return HandRankType.FourKind;
+            if (IsFullHouse(cardInfos)) return HandRankType.FullHouse;
+            if (IsFlush(cardInfos)) return HandRankType.Flush;
+            if (IsStraight(cardInfos)) return HandRankType.Straight;
+            if (IsThreeOfAKind(cardInfos)) return HandRankType.Triple;
+            if (IsTwoPair(cardInfos)) return HandRankType.TwoPair;
+            if (IsOnePair(cardInfos)) return HandRankType.OnePair;
+            if (IsRedFlush(cardInfos)) return HandRankType.RedFlush;
+            if (IsBlackFlush(cardInfos)) return HandRankType.BlackFlush;
+
+            return HandRankType.None;
+        }
+
+        // 카드 정보를 추출하는 함수 (여러 방법 시도)
+        private CardInfo GetCardInfo(GameObject cardObject)
+        {
+            CardInfo info = new CardInfo();
+            info.gameObject = cardObject;
+
+            // 방법 1: CardScript 컴포넌트에서 가져오기
+            CardScript cardScript = cardObject.GetComponent<CardScript>();
+            if (cardScript != null)
+            {
+                // RSF 시스템용 필드가 있는지 확인
+                try
+                {
+                    var valueField = cardScript.GetType().GetField("cardValue");
+                    var suitField = cardScript.GetType().GetField("cardSuit");
+
+                    if (valueField != null && suitField != null)
+                    {
+                        info.value = (int)valueField.GetValue(cardScript);
+                        info.suit = (CardSuit)suitField.GetValue(cardScript);
+
+                        if (info.value > 0 && info.value <= 13)
+                        {
+                            return info;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            // 방법 2: 카드 이름에서 추출 (예: "HeartAce", "SpadeKing" 등)
+            string cardName = cardObject.name.ToLower();
+
+            // 슈트 판별
+            if (cardName.Contains("heart"))
+                info.suit = CardSuit.Hearts;
+            else if (cardName.Contains("diamond"))
+                info.suit = CardSuit.Diamonds;
+            else if (cardName.Contains("club"))
+                info.suit = CardSuit.Clubs;
+            else if (cardName.Contains("spade"))
+                info.suit = CardSuit.Spades;
+
+            // 값 판별
+            if (cardName.Contains("ace") || cardName.Contains("a"))
+                info.value = 1;
+            else if (cardName.Contains("king") || cardName.Contains("k"))
+                info.value = 13;
+            else if (cardName.Contains("queen") || cardName.Contains("q"))
+                info.value = 12;
+            else if (cardName.Contains("jack") || cardName.Contains("j"))
+                info.value = 11;
+            else if (cardName.Contains("10"))
+                info.value = 10;
+            else if (cardName.Contains("9"))
+                info.value = 9;
+            else if (cardName.Contains("8"))
+                info.value = 8;
+            else if (cardName.Contains("7"))
+                info.value = 7;
+            else if (cardName.Contains("6"))
+                info.value = 6;
+            else if (cardName.Contains("5"))
+                info.value = 5;
+            else if (cardName.Contains("4"))
+                info.value = 4;
+            else if (cardName.Contains("3"))
+                info.value = 3;
+            else if (cardName.Contains("2"))
+                info.value = 2;
+
+            // 방법 3: 기본값 설정 (테스트용)
+            if (info.value == 0)
+            {
+                Debug.LogWarning($"Could not determine card value for {cardObject.name}. Using default values.");
+                info.value = Random.Range(1, 14); // 임시 랜덤 값
+                info.suit = (CardSuit)Random.Range(0, 4); // 임시 랜덤 슈트
+            }
+
+            return info;
+        }
+
+        // 족보 판정 함수들
+        private bool IsRoyalStraightFlush(List<CardInfo> cards)
+        {
+            if (!IsFlush(cards)) return false;
+
+            int[] royalValues = { 1, 10, 11, 12, 13 };
+            var values = cards.Select(c => c.value).OrderBy(v => v).ToArray();
+
+            return values.SequenceEqual(royalValues);
+        }
+
+        private bool IsStraightFlush(List<CardInfo> cards)
+        {
+            return IsFlush(cards) && IsStraight(cards);
+        }
+
+        private bool IsFourOfAKind(List<CardInfo> cards)
+        {
+            var groups = cards.GroupBy(c => c.value);
+            return groups.Any(g => g.Count() == 4);
+        }
+
+        private bool IsFullHouse(List<CardInfo> cards)
+        {
+            var groups = cards.GroupBy(c => c.value);
+            return groups.Count() == 2 && groups.Any(g => g.Count() == 3) && groups.Any(g => g.Count() == 2);
+        }
+
+        private bool IsFlush(List<CardInfo> cards)
+        {
+            var firstSuit = cards[0].suit;
+            return cards.All(c => c.suit == firstSuit);
+        }
+
+        private bool IsStraight(List<CardInfo> cards)
+        {
+            var values = cards.Select(c => c.value).OrderBy(v => v).ToArray();
+
+            // 일반적인 스트레이트 확인
+            for (int i = 0; i < values.Length - 1; i++)
+            {
+                if (values[i + 1] - values[i] != 1)
+                {
+                    // A-2-3-4-5 스트레이트 확인 (A가 1로 취급)
+                    if (i == 0 && values[0] == 1 && values[4] == 13)
+                    {
+                        // A-10-J-Q-K 확인
+                        int[] aceHighValues = { 1, 10, 11, 12, 13 };
+                        return values.SequenceEqual(aceHighValues);
+                    }
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private bool IsThreeOfAKind(List<CardInfo> cards)
+        {
+            var groups = cards.GroupBy(c => c.value);
+            return groups.Any(g => g.Count() == 3);
+        }
+
+        private bool IsTwoPair(List<CardInfo> cards)
+        {
+            var groups = cards.GroupBy(c => c.value);
+            return groups.Count(g => g.Count() == 2) == 2;
+        }
+
+        private bool IsOnePair(List<CardInfo> cards)
+        {
+            var groups = cards.GroupBy(c => c.value);
+            return groups.Count(g => g.Count() == 2) == 1;
+        }
+
+        private bool IsRedFlush(List<CardInfo> cards)
+        {
+            bool allRed = cards.All(c => c.suit == CardSuit.Hearts || c.suit == CardSuit.Diamonds);
+            return allRed && !IsFlush(cards);
+        }
+
+        private bool IsBlackFlush(List<CardInfo> cards)
+        {
+            bool allBlack = cards.All(c => c.suit == CardSuit.Spades || c.suit == CardSuit.Clubs);
+            return allBlack && !IsFlush(cards);
+        }
+
+        private string GetHandRankingName(HandRankType handRank)
+        {
+            switch (handRank)
+            {
+                case HandRankType.RoyalStraightFlush: return "Royal Straight Flush";
+                case HandRankType.StraightFlush: return "Straight Flush";
+                case HandRankType.FourKind: return "Four of a Kind";
+                case HandRankType.FullHouse: return "Full House";
+                case HandRankType.Flush: return "Flush";
+                case HandRankType.Straight: return "Straight";
+                case HandRankType.Triple: return "Three of a Kind";
+                case HandRankType.TwoPair: return "Two Pair";
+                case HandRankType.OnePair: return "One Pair";
+                case HandRankType.RedFlush: return "Red Flush";
+                case HandRankType.BlackFlush: return "Black Flush";
+                default: return "High Card";
+            }
+        }
+
+        // 수동으로 족보 확인 (디버그용)
+        [ContextMenu("Check Hand Ranking")]
+        public void CheckHandRanking()
+        {
+            UpdateHandRanking();
+        }
+
+        // 현재 족보 타입 반환
+        public HandRankType GetCurrentHandRankType()
+        {
+            return currentHandRankType;
+        }
+
+        // 현재 족보 이름 반환
+        public string GetCurrentHandRankingName()
+        {
+            return currentHandRanking;
+        }
+
+        // 수동으로 카드 설정하는 함수 (테스트용)
+        public void SetManualCards(GameObject[] handCards, GameObject[] commCards)
+        {
+            if (handCards != null && handCards.Length >= 2)
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    manualHandCards[i] = handCards[i];
+                }
+            }
+
+            if (commCards != null && commCards.Length >= 3)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    manualCommunityCards[i] = commCards[i];
+                }
+            }
+
+            UpdateHandRanking();
+        }
+    }
+
+    // 카드 정보를 담는 구조체
+    [System.Serializable]
+    public struct CardInfo
+    {
+        public int value;
+        public CardSuit suit;
+        public GameObject gameObject;
+    }
+}
