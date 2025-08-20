@@ -15,6 +15,6 @@ namespace Code.RSF
             cardValue = value;
             cardSuit = suit;
         }
-        
+
     }
 }

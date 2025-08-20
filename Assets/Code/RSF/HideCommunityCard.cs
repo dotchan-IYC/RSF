@@ -16,7 +16,7 @@ namespace Code.RSF
         private void Start()
         {
             _gameCicle.ShowEveryCard += Hide;
-            _gameCicle.ResetGame += Show;
+            _gameCicle.DrawCards += Show;
         }
 
         private void Hide()

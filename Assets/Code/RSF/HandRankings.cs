@@ -338,10 +338,10 @@ namespace Code.RSF
 
             if (showDebugInfo)
             {
-                Debug.Log("=== Card Values ===");
+                //Debug.Log("=== Card Values ===");
                 foreach (var card in cardInfos)
                 {
-                    Debug.Log($"Value: {card.value}, Suit: {card.suit}");
+                    //Debug.Log($"Value: {card.value}, Suit: {card.suit}");
                 }
             }
 

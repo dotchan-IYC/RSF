@@ -24,34 +24,34 @@ public class Text : MonoBehaviour
 
     IEnumerator ColorChange()
     {
-        while (g !=255)
+        while (g <=255)
         {
-            g++;
+            g+=2;
             yield return new WaitForSeconds(0.01f);
         }
-        while (r != 0)
+        while (r >= 0)
         {
-            r--;
+            r-=2;
             yield return new WaitForSeconds(0.01f);
         }
-        while (b != 255)
+        while (b <= 255)
         {
-            b++;
+            b+=2;
             yield return new WaitForSeconds(0.01f);
         }
-        while (g != 0)
+        while (g >= 0)
         {
-            g--;
+            g-=2;
             yield return new WaitForSeconds(0.01f);
         }
-            while (r !=255)
+        while (r <=255)
         {
-            r++;
+            r += 2;
             yield return new WaitForSeconds(0.01f);
         }
-        while (b != 0)
+        while (b >= 0)
         {
-            b--;
+            b -= 2;
             yield return new WaitForSeconds(0.01f);
         }
 

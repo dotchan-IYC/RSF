@@ -20,7 +20,7 @@ namespace Code.RSF
             _communityCards = GetComponent<CommunityCards>();
             _mouseInput = GetComponent<MouseInput>();
             _mouseInput.LeftMouseClick += ChangeCard;
-            _cardPool.DrawCards += ResetCanChangeNum;
+            _gameCicle.ResetGame += ResetCanChangeNum;
         }
 
         private void ResetCanChangeNum()
@@ -32,7 +32,7 @@ namespace Code.RSF
         private void ChangeCard()
         {
             if (_changeNum == 2) return;//두 번 다 바꿨으면 작동 안 함
-            if (_gameCicle._level != 3) return;//지금이 바꿀 수 있는 때가 아니면 작동 안 함
+            if (_gameCicle._level != 2) return;//지금이 바꿀 수 있는 때가 아니면 작동 안 함
             GameObject[] changeCard = _handCard._handCards;
             for (int i = 0; i < changeCard.Length; i++)
             {
